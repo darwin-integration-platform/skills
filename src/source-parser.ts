@@ -148,6 +148,16 @@ export function parseSource(input: string): ParsedSource {
     return parseSource(`https://gitlab.com/${gitlabPrefixMatch[1]!}`);
   }
 
+  // Prefix shorthand: azdo:org/project/repo -> https://dev.azure.com/org/project/_git/repo
+  const azdoPrefixMatch = input.match(/^azdo:([^/]+)\/([^/]+)\/(.+)$/);
+  if (azdoPrefixMatch) {
+    const [, org, project, repo] = azdoPrefixMatch;
+    return {
+      type: 'azure-devops',
+      url: `https://dev.azure.com/${org}/${project}/_git/${repo}`,
+    };
+  }
+
   // Local path: absolute, relative, or current directory
   if (isLocalPath(input)) {
     const resolvedPath = resolve(input);
@@ -239,6 +249,34 @@ export function parseSource(input: string): ParsedSource {
     }
   }
 
+  // Azure DevOps modern URL: https://dev.azure.com/org/project/_git/repo
+  const azdoMatch = input.match(/^(https?):\/\/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/?#]+)/);
+  if (azdoMatch) {
+    const [, protocol, org, project, repo] = azdoMatch;
+    const cloneUrl = `${protocol}://dev.azure.com/${org}/${project}/_git/${repo}`;
+    const parsedUrl = new URL(input);
+    const version = parsedUrl.searchParams.get('version'); // e.g. "GBmain"
+    const path = parsedUrl.searchParams.get('path'); // e.g. "/skills"
+    const ref = version?.startsWith('GB') ? version.slice(2) : undefined;
+    const subpath = path ? sanitizeSubpath(path.replace(/^\//, '')) : undefined;
+    return { type: 'azure-devops', url: cloneUrl, ref, subpath };
+  }
+
+  // Azure DevOps legacy URL: https://org.visualstudio.com/project/_git/repo
+  const azdoLegacyMatch = input.match(
+    /^(https?):\/\/([^.]+)\.visualstudio\.com\/([^/]+)\/_git\/([^/?#]+)/
+  );
+  if (azdoLegacyMatch) {
+    const [, protocol, org, project, repo] = azdoLegacyMatch;
+    const cloneUrl = `${protocol}://${org}.visualstudio.com/${project}/_git/${repo}`;
+    const parsedUrl = new URL(input);
+    const version = parsedUrl.searchParams.get('version');
+    const path = parsedUrl.searchParams.get('path');
+    const ref = version?.startsWith('GB') ? version.slice(2) : undefined;
+    const subpath = path ? sanitizeSubpath(path.replace(/^\//, '')) : undefined;
+    return { type: 'azure-devops', url: cloneUrl, ref, subpath };
+  }
+
   // GitHub shorthand: owner/repo, owner/repo/path/to/skill, or owner/repo@skill-name
   // Exclude paths that start with . or / to avoid matching local paths
   // First check for @skill syntax: owner/repo@skill-name
@@ -293,8 +331,16 @@ function isWellKnownUrl(input: string): boolean {
     const parsed = new URL(input);
 
     // Exclude known git hosts that have their own handling
-    const excludedHosts = ['github.com', 'gitlab.com', 'raw.githubusercontent.com'];
+    const excludedHosts = [
+      'github.com',
+      'gitlab.com',
+      'raw.githubusercontent.com',
+      'dev.azure.com',
+    ];
     if (excludedHosts.includes(parsed.hostname)) {
+      return false;
+    }
+    if (parsed.hostname.endsWith('.visualstudio.com')) {
       return false;
     }
 

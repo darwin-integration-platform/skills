@@ -191,6 +191,42 @@ describe('parseSource', () => {
     });
   });
 
+  describe('Azure DevOps URL tests', () => {
+    it('Azure DevOps - modern dev.azure.com URL', () => {
+      const result = parseSource('https://dev.azure.com/myorg/myproject/_git/myrepo');
+      expect(result.type).toBe('azure-devops');
+      expect(result.url).toBe('https://dev.azure.com/myorg/myproject/_git/myrepo');
+      expect(result.ref).toBeUndefined();
+      expect(result.subpath).toBeUndefined();
+    });
+
+    it('Azure DevOps - URL with branch (GB prefix)', () => {
+      const result = parseSource(
+        'https://dev.azure.com/myorg/myproject/_git/myrepo?version=GBmain'
+      );
+      expect(result.type).toBe('azure-devops');
+      expect(result.url).toBe('https://dev.azure.com/myorg/myproject/_git/myrepo');
+      expect(result.ref).toBe('main');
+    });
+
+    it('Azure DevOps - URL with path and branch', () => {
+      const result = parseSource(
+        'https://dev.azure.com/myorg/myproject/_git/myrepo?path=/skills&version=GBmain'
+      );
+      expect(result.type).toBe('azure-devops');
+      expect(result.url).toBe('https://dev.azure.com/myorg/myproject/_git/myrepo');
+      expect(result.ref).toBe('main');
+      expect(result.subpath).toBe('skills');
+    });
+
+    it('Azure DevOps - legacy visualstudio.com URL', () => {
+      const result = parseSource('https://myorg.visualstudio.com/myproject/_git/myrepo');
+      expect(result.type).toBe('azure-devops');
+      expect(result.url).toBe('https://myorg.visualstudio.com/myproject/_git/myrepo');
+      expect(result.ref).toBeUndefined();
+    });
+  });
+
   describe('Git URL fallback tests', () => {
     it('Git URL - SSH format', () => {
       const result = parseSource('git@github.com:owner/repo.git');
@@ -384,6 +420,14 @@ describe('Prefix shorthand tests', () => {
       const result = parseSource('github:googleworkspace/cli');
       expect(result.type).toBe('github');
       expect(result.url).toBe('https://github.com/googleworkspace/cli.git');
+    });
+  });
+
+  describe('azdo: prefix', () => {
+    it('azdo:org/project/repo - basic', () => {
+      const result = parseSource('azdo:myorg/myproject/myrepo');
+      expect(result.type).toBe('azure-devops');
+      expect(result.url).toBe('https://dev.azure.com/myorg/myproject/_git/myrepo');
     });
   });
 

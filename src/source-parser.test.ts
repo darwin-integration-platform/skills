@@ -72,6 +72,57 @@ describe('source-parser', () => {
     });
   });
 
+  describe('Azure DevOps Support', () => {
+    it('parses modern dev.azure.com URL', () => {
+      const result = parseSource('https://dev.azure.com/myorg/myproject/_git/myrepo');
+      expect(result).toEqual({
+        type: 'azure-devops',
+        url: 'https://dev.azure.com/myorg/myproject/_git/myrepo',
+        ref: undefined,
+        subpath: undefined,
+      });
+    });
+
+    it('parses dev.azure.com URL with branch (GB prefix)', () => {
+      const result = parseSource(
+        'https://dev.azure.com/myorg/myproject/_git/myrepo?version=GBmain'
+      );
+      expect(result).toMatchObject({
+        type: 'azure-devops',
+        url: 'https://dev.azure.com/myorg/myproject/_git/myrepo',
+        ref: 'main',
+      });
+    });
+
+    it('parses dev.azure.com URL with path and branch', () => {
+      const result = parseSource(
+        'https://dev.azure.com/myorg/myproject/_git/myrepo?path=/skills&version=GBmain'
+      );
+      expect(result).toMatchObject({
+        type: 'azure-devops',
+        url: 'https://dev.azure.com/myorg/myproject/_git/myrepo',
+        ref: 'main',
+        subpath: 'skills',
+      });
+    });
+
+    it('parses legacy visualstudio.com URL', () => {
+      const result = parseSource('https://myorg.visualstudio.com/myproject/_git/myrepo');
+      expect(result).toMatchObject({
+        type: 'azure-devops',
+        url: 'https://myorg.visualstudio.com/myproject/_git/myrepo',
+      });
+    });
+
+    it('parses azdo: shorthand', () => {
+      const result = parseSource('azdo:myorg/myproject/myrepo');
+      expect(result).toEqual({
+        type: 'azure-devops',
+        url: 'https://dev.azure.com/myorg/myproject/_git/myrepo',
+      });
+    });
+  });
+
   describe('Existing GitHub Support', () => {
     it('parses github shorthand', () => {
       const result = parseSource('vercel-labs/agent-skills');
